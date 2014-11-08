@@ -1,0 +1,7 @@
+.bigmem*
+bigmem.ko
+bigmem.o
+bigmem.mod.*
+modules.order
+Module.symvers
+.tmp_versions
