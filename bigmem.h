@@ -13,7 +13,7 @@
 struct big_mem
 {
 	unsigned long *addrs;   ///< 内存块首地址数组
-	unsigned long *sizes;   ///< 内存块大小数组
+	size_t *sizes;   ///< 内存块大小数组
 	unsigned long mem_count;  ///< 内存块数量
 	size_t mem_size;  ///< 内存大小
 #ifndef USER_SPACE
@@ -26,7 +26,11 @@ struct big_mem
 /// @brief 初始化bigmem结构
 /// @param[in] size 内存大小
 /// @retval 0成功,<0失败
-int init_bigmem(struct big_mem *mem,size_t size,gfp_t flags);
+void init_bigmem(struct big_mem *mem,size_t size,gfp_t flags);
+/// @brief 清除bigmem结构
+/// @param[in] size 内存大小
+/// @retval 0成功,<0失败
+int clean_bigmem(struct big_mem *mem);
 #endif   /// USER_SPACE
 
 /// @brief 把缓冲区数据写入内存

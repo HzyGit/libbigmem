@@ -15,11 +15,84 @@
 /// @retval 0成功,<0失败
 int init_bigmem(struct big_mem *mem,size_t size,gfp_t flags)
 {
+	int err=0;   ///< 错误码
+	unsigned long block_count;   ///< 内存块
+	size_t size;   ///< 末块大小
+	int i;
+	int mem_index=0;
+	
+	/// 判断参数
 	if(NULL==mem)
 		return -EINVAL;
-	return 0;
+	if((err=mem_count(size,&block_count,&size))<0)
+		return err;
+	if(NULL==mem)
+		return -EINVAL;
+	/// 初始化内存块
+	err=0;
+	mem->mem_size=mem_size;
+	mem->mem_count=block_count;
+	mem->addrs=(unsigned long*)kmalloc(sizeof(unsigned long)*mem->mem_count,GFP_KERNEL|GFP_ATOMIC);
+	mem->sizes=(size_t*)kmalloc(sizeof(size_t)*mem->mem_count,GFP_KERNEL|GFP_ATOMIC);
+	if(NULL==mem->addrs||NULL==mem->sizes)
+	{
+		err=-ENOMEM;
+		goto clean_addrs;
+	}
+	/// 分配内存
+	for(mem_index=0;mem_index<mem->count-1;mem_index++)
+	{
+		if((mem->addrs[mem_index]=__get_free_pages(flags,BIGMEM_MAX_ORDER))==0)
+		{
+			err=-ENOMEM;
+			goto clean_pages;
+		}
+	}
+	mem->addrs[mem->count-1]=__get_free_pages(flags,get_order(size));
+	mem_index++;
+	if(mem->addrs[mem->count-1]==0)
+	{
+		err=-ENOMEM;
+		goto clean_pages;
+	}
+	/// 初始化锁
+	rwlock_init(&mem->lock);
+	return err;
+clean_pages:
+	for(i=0;i<mem_index;i++)
+	{
+		if(i==mem->count-1)
+			free_pages(mem->addrs[i],get_order(size));
+		else
+			free_pages(mem->addrs[i],BIGMEM_MAX_ORDER);
+	}
+clean_addrs:
+	if(mem->addrs!=NULL)
+		free(mem->addrs);
+	if(mem->addrs!=NULL)
+		free(mem->addrs);
+	return err;
 }
 EXPORT_SYMBOL(init_bigmem);
+
+/// @brief 清除bigmem结构
+/// @param[in] size 内存大小
+/// @retval 0成功,<0失败
+void clean_bigmem(struct big_mem *mem)
+{
+	int i=0;
+	if(NULL==mem)
+		return;
+	/// 释放内存
+	for(i=0;i<mem->count;i++)
+	{
+		if(i==mem->count-1)
+			free_pages(mem->addrs[i],get_order(mem->mem_size-(mem->count-1)*PAGE_SIZE*(1<<BIGMEM_ORDER)));
+		else
+			free_pages(mem->addrs[i],BIGMEM_ORDER);
+	}
+}
+EXPORT_SYMPOL(clean_bigmem);
 #endif   /// USER_SPACE
 
 
@@ -104,13 +177,27 @@ int load_bigmem_proc(struct big_mem *mem,const char *proc_path)
 /// @param[out] count内存块个数
 /// @param[out] size 未块的大小
 /// @retval 0成功, -1失败
-static int mem_count(size_t mem_size,unsigned long *count,size_t size)
+static int mem_count(size_t mem_size,unsigned long *mem_count,size_t *block_size)
 {
 	int order=0;
+	int count=0;   ///< 内存块数
+	size_t size=0;   ///< 内存末块的大小
 	/// mem_size非法参数
 	if(mem_size==0)
 		return -EINVAL;
+	/// 计算count,size
 	order=get_order(mem_size);
+	printk("order:%d\n",order);
+
+	count=order-BIGMEM_MAX_ORDER>0?1<<(order-BIGMEM_MAX_ORDER):1;
+	size=count==1?mem_size:mem_size-(1<<BIGMEM_MAX_ORDER)*PAGE_SIZE;
+	if(count>BIGMEM_MAX_COUNT)
+		return -ENOMEM;
+	///返回
+	if(NULL!=mem_count)
+		*mem_count=count;
+	if(NULL!=block_size)
+		*block_size=size;
 	return 0;
 }
 
