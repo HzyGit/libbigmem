@@ -26,11 +26,17 @@ struct big_mem
 /// @brief 初始化bigmem结构
 /// @param[in] size 内存大小
 /// @retval 0成功,<0失败
-void init_bigmem(struct big_mem *mem,size_t size,gfp_t flags);
+int init_bigmem(struct big_mem *mem,size_t size,gfp_t flags);
 /// @brief 清除bigmem结构
-/// @param[in] size 内存大小
-/// @retval 0成功,<0失败
-int clean_bigmem(struct big_mem *mem);
+void clean_bigmem(struct big_mem *mem);
+#else   /// USER_SPACE
+
+/// @breif 读取内存设备文件，映射bigmem结构
+/// @retval 0成功 -1失败
+int mmap_bigmem(struct big_mem *mem,int fd,int port,int flags);
+/// @brief 取消内存设备的映射,并释放bigmem的内存
+/// @retval 0 成功 <0失败
+int unmmap_clean_bigmem(struct big_mem *mem);
 #endif   /// USER_SPACE
 
 /// @brief 把缓冲区数据写入内存
@@ -47,6 +53,7 @@ int write_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_siz
 /// @retval 0成功, <0失败
 int read_bigmem(struct big_mem *mem,size_t begin,void *buf,size_t buf_size);
 
+
 /// @brief 设置内存数据为data
 /// @param[in] begin,len设置内存的范围(起始，长度)
 /// @param[in] data,设置为的值
@@ -54,21 +61,36 @@ int read_bigmem(struct big_mem *mem,size_t begin,void *buf,size_t buf_size);
 int set_bigmem(struct big_mem *mem,size_t begin,size_t len,char data);
 
 /// @brief 返回内存数据的长度
-int get_bigmem_len(const struct big_mem *mem);
+size_t get_bigmem_len(const struct big_mem *mem);
 
 /// @breif 对比缓冲区和内存结构中的数据
 /// @param[in] begin,对比数据的首地址
 /// @param[in] buf,缓冲区首地址
 /// @param[in] size, 缓冲区大小
-/// @retval 参考memcmp的返回值
-int cmp_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size);
+/// @param[out] res 参考memcmp的返回值
+/// @retval 0成功 -1失败
+int cmp_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size,int *res);
 
 #ifndef USER_SPACE
-/// @brief 将big_mem数据写入proc文件
-int dump_bigmem_proc(struct big_mem *mem,const char *proc_path);
+/// @brief 将big_mem数据序列化为字符串
+int dump_bigmem(struct big_mem *mem,char **strdata);
 #else    /// USER_SAPCE
-/// @brief 将big_mem从proc中读出
-int load_bigmem_proc(struct big_mem *mem,const char *proc_path);
+/// @brief 将字符串反序列化为big_mem
+int load_bigmem(struct big_mem *mem,const char *strdata);
 #endif  /// USER_SPACE
+
+#ifndef USER_SPACE
+/// @brief 把缓冲区数据写入内存,使用bh锁
+int write_bigmem_bh(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size);
+
+/// @brief 读取数据到缓冲区 使用bh锁
+int read_bigmem_bh(struct big_mem *mem,size_t begin,void *buf,size_t buf_size);
+
+/// @brief 设置内存数据为data
+int set_bigmem_bh(struct big_mem *mem,size_t begin,size_t len,char data);
+
+/// @breif 对比缓冲区和内存结构中的数据
+int cmp_bigmem_bh(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size,int *res);
+#endif   ///USER_SPACE
 
 #endif  //BIG_MEM_H
