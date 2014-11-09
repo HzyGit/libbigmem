@@ -6,7 +6,9 @@
 #else    /// USER_SPACE
 #include <string.h>
 #include <stdlib.h>
-#include <error.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/mman.h>
 #endif   ///USER_SPACE
 
 #include "bigmem.h"
@@ -45,6 +47,7 @@ static int cal_bigmem_coord(struct big_mem *mem,size_t index,unsigned long *bloc
 	return 0;
 }
 
+#ifndef USER_SPACE
 /// @brief 依据大小计算内存块数,及末尾块大小
 /// @param[out] count内存块个数
 /// @param[out] size 未块的大小
@@ -72,6 +75,7 @@ static int mem_count(size_t mem_size,unsigned long *mem_count,size_t *block_size
 		*block_size=size;
 	return 0;
 }
+#endif  /// USER_SPACE
 
 static int _write_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size)
 {
@@ -319,11 +323,11 @@ int write_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_siz
 	int err=0;
 	if(NULL==mem)
 		return -EINVAL;
-#ifndef USER_SAPCE
+#ifndef USER_SPACE
 	write_lock(&mem->lock);
 #endif
 	err=_write_bigmem(mem,begin,buf,buf_size);
-#ifndef USER_SAPCE
+#ifndef USER_SPACE
 	write_unlock(&mem->lock);
 #endif
 	return err;
@@ -369,7 +373,7 @@ int set_bigmem(struct big_mem *mem,size_t begin,size_t len,char data)
 	write_lock(&mem->lock);
 #endif
 	err=_set_bigmem(mem,begin,len,data);
-#ifndef USER_SAPCE
+#ifndef USER_SPACE
 	write_unlock(&mem->lock);
 #endif
 	return err;
@@ -541,7 +545,7 @@ int load_bigmem(struct big_mem *mem,const char *strdata)
 	/// 分配mem->addrs,mem->sizes
 	mem->addrs=(unsigned long*)malloc(sizeof(unsigned long)*mem->mem_count);
 	mem->sizes=(size_t*)malloc(sizeof(size_t)*mem->mem_count);
-	if(NULL==mem->addrs||NULL==mem->size)
+	if(NULL==mem->addrs||NULL==mem->sizes)
 		goto free_mem;
 	/// 反序列化 addrs sizes
 	for(i=0;i<mem->mem_count;i++);
@@ -607,9 +611,9 @@ int unmmap_clean_bigmem(struct big_mem *mem)
 	if(NULL==mem||NULL==mem->addrs||NULL==mem->sizes)
 		return -EINVAL;
 	/// 取消映射的内存
-	for(i=0;i<mem->count;++i)
-		if(mem->addr&&mem->addr[i]!=0)
-			munmap((void*)mem->addr[i],mem->sizes[i]);
+	for(i=0;i<mem->mem_count;++i)
+		if(mem->addrs&&mem->addrs[i]!=0)
+			munmap((void*)mem->addrs[i],mem->sizes[i]);
 	/// 释放内存
 	free(mem->sizes);
 	free(mem->addrs);
@@ -617,6 +621,7 @@ int unmmap_clean_bigmem(struct big_mem *mem)
 
 #endif
 
+#ifndef USER_SPACE
 static int __init init_bigmem_module(void)
 {
 	printk(KERN_INFO "bigmem(v%s) module load ok!\n",VERSION);
@@ -635,4 +640,4 @@ module_exit(cleanup_bigmem_module);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR(AUTHOR);
 MODULE_DESCRIPTION(DESCRIPTION);
-
+#endif /// USER_SPACE
