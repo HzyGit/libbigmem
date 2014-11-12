@@ -350,7 +350,7 @@ int read_bigmem(struct big_mem *mem,size_t begin,void *buf,size_t buf_size)
 #endif
 	err=_read_bigmem(mem,begin,buf,buf_size);
 #ifndef USER_SPACE
-	write_unlock(&mem->lock);
+	read_unlock(&mem->lock);
 #endif
 	return err;
 }
@@ -439,7 +439,7 @@ int read_bigmem_bh(struct big_mem *mem,size_t begin,void *buf,size_t buf_size)
 		return -EINVAL;
 	read_lock_bh(&mem->lock);
 	err=_read_bigmem(mem,begin,buf,buf_size);
-	read_lock_bh(&mem->lock);
+	read_unlock_bh(&mem->lock);
 	return err;
 }
 EXPORT_SYMBOL(read_bigmem_bh);
@@ -498,7 +498,7 @@ int dump_bigmem(struct big_mem *mem,char **strdata)
 		str=*strdata+len;
 		for(i=0;i<mem->mem_count;i++)
 		{
-			len+=snprintf(str,STR_LEN-len,"%lu %lu\n",mem->addrs[i],mem->sizes[i]);
+			len+=snprintf(str,STR_LEN-len,"%lu %lu\n",virt_to_phys((char*)(mem->addrs[i])),mem->sizes[i]);
 			if(len>=STR_LEN)
 			{
 				err=-ENOMEM;
