@@ -12,7 +12,7 @@ clean: kernel_clean userspace_clean
 userspace_build:
 	gcc -o libbigmem.so -DUSER_SPACE -fPIC -shared bigmem.c
 	cp libbigmem.so /usr/lib64/
-	gcc -DUSER_SPACE -o test -lbigmem test.c
+	gcc -g -DUSER_SPACE -o test -lbigmem test.c
 userspace_clean:
 	-rm libbigmem.so
 	-rm test
