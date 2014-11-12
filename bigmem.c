@@ -561,6 +561,7 @@ int load_bigmem(struct big_mem *mem,const char *strdata)
 			goto free_mem;
 		}
 	}
+	return 0;
 free_mem:
 	if(mem->addrs!=NULL)
 		free(mem->addrs);
@@ -594,9 +595,13 @@ int mmap_bigmem(struct big_mem *mem,int fd,int port,int flags)
 		}
 		mem->addrs[i]=(unsigned long)buf;
 	}
+	return 0;
 free_mmap:
 	for(i=0;i<map_index;i++)
+	{
 		munmap((void*)mem->addrs[i],mem->sizes[i]);
+		mem->addrs[i]=0;
+	}
 	return err;
 
 }
@@ -612,10 +617,14 @@ int unmmap_clean_bigmem(struct big_mem *mem)
 	/// 取消映射的内存
 	for(i=0;i<mem->mem_count;++i)
 		if(mem->addrs&&mem->addrs[i]!=0)
+		{
 			munmap((void*)mem->addrs[i],mem->sizes[i]);
+			mem->addrs[i]=0;
+		}
 	/// 释放内存
 	free(mem->sizes);
 	free(mem->addrs);
+	mem->sizes=mem->addrs=0;
 }
 
 #endif
