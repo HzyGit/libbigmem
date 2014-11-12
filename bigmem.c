@@ -62,7 +62,6 @@ static int mem_count(size_t mem_size,unsigned long *mem_count,size_t *block_size
 		return -EINVAL;
 	/// 计算count,size
 	order=get_order(mem_size);
-	printk("order:%d\n",order);
 
 	count=order-BIGMEM_MAX_ORDER>0?1<<(order-BIGMEM_MAX_ORDER):1;
 	size=count==1?mem_size:mem_size-(1<<BIGMEM_MAX_ORDER)*PAGE_SIZE;
@@ -259,7 +258,7 @@ int init_bigmem(struct big_mem *mem,size_t mem_size,gfp_t flags)
 			err=-ENOMEM;
 			goto clean_pages;
 		}
-		mem->sizes[mem_index]=1<<BIGMEM_MAX_ORDER;
+		mem->sizes[mem_index]=(1<<BIGMEM_MAX_ORDER)*PAGE_SIZE;
 	}
 	mem->addrs[mem->mem_count-1]=__get_free_pages(flags,get_order(end_size));
 	mem_index++;
