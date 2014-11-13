@@ -145,8 +145,9 @@ static int test_set(struct big_mem *mem)
 	char data='a';
 	int err=0;
 	const int len=20;
+	size_t start=4*1024*1024-10;
 	int i=0;
-	if((err=set_bigmem(mem,30,len,data))<0)
+	if((err=set_bigmem(mem,start,len,data))<0)
 	{
 		printk("set_bigmem failed\n");
 		return err;
@@ -154,7 +155,7 @@ static int test_set(struct big_mem *mem)
 	for(i=0;i<len;i++)
 	{
 		char value;
-		if((err=read_bigmem(mem,30+i,&value,1))<0)
+		if((err=read_bigmem(mem,start+i,&value,1))<0)
 		{
 			printk("read_bigmem failed\n");
 			break;
@@ -236,7 +237,7 @@ MODULE_AUTHOR("hzy(hzy.oop@gmail.com");
 int display_bigmem(struct big_mem *mem,FILE *fp)
 {
 	int err=0;
-	size_t i=0;
+	int i=0;
 	if(NULL==mem||NULL==fp)
 		return 0;
 	for(i=0;i<get_bigmem_len(mem);++i)
@@ -248,8 +249,21 @@ int display_bigmem(struct big_mem *mem,FILE *fp)
 			return err;
 		}
 		if(data!=0)
-			fprintf(fp,"(%d,%d)\n",i,data);
+			fprintf(fp,"(%d,%c)\n",i,data);
 	}
+}
+
+int display_struct(struct big_mem *mem,FILE *fp)
+{
+	int i=0;
+	if(NULL==mem)
+		return -EINVAL;
+	fprintf(fp,"count:%lu,size:%zu\n",mem->mem_count,mem->mem_size);
+	if(NULL==mem->addrs||NULL==mem->sizes)
+		return -EINVAL;
+	for(i=0;i<mem->mem_count;i++)
+		fprintf(fp,"0x%lx %zu\n",mem->addrs[i],mem->sizes[i]);
+	return 0;
 }
 
 static int load_mem(struct big_mem *mem,const char *proc_name)
@@ -281,12 +295,17 @@ static int load_mem(struct big_mem *mem,const char *proc_name)
 		p+=strlen(p);
 	}
 	fclose(fp);
+	printf("catch the proc string:\n%s\n",buf);
+	printf("--------------------------\n");
 	/// 反序列化
 	if((err=load_bigmem(mem,buf))<0)
 	{
 		error_at_line(0,errno,__FILE__,__LINE__,"load_bigmem failed");
 		return err;
 	}
+	printf("display the struct:\n");
+	display_struct(mem,stdout);
+	printf("------------------------\n");
 	/// 映射物理内存
 	if((fd=open("/dev/mem",O_RDWR))<0)
 	{

@@ -275,16 +275,23 @@ clean_pages:
 	for(i=0;i<mem_index;i++)
 	{
 		if(i==mem->mem_count-1)
+		{
 			free_pages(mem->addrs[i],get_order(end_size));
+			mem->addrs[i]=0;
+		}
 		else
+		{
 			free_pages(mem->addrs[i],BIGMEM_MAX_ORDER);
+			mem->addrs[i]=0;
+		}
 	}
 clean_addrs:
 	if(mem->addrs!=NULL)
 		kfree(mem->addrs);
 	if(mem->sizes!=NULL)
 		kfree(mem->sizes);
-	mem->addrs=mem->sizes=NULL;
+	mem->addrs=NULL;
+	mem->sizes=NULL;
 	return err;
 }
 EXPORT_SYMBOL(init_bigmem);
@@ -489,7 +496,7 @@ int dump_bigmem(struct big_mem *mem,char **strdata)
 	{
 		int i=0;
 		char *str=*strdata;
-		size_t len=snprintf(str,STR_LEN,"%lu %lu\n",mem->mem_count,mem->mem_size);
+		size_t len=snprintf(str,STR_LEN,"%lu %zu\n",mem->mem_count,mem->mem_size);
 		if(len>=STR_LEN)
 		{
 			err=-ENOMEM;
@@ -498,7 +505,7 @@ int dump_bigmem(struct big_mem *mem,char **strdata)
 		str=*strdata+len;
 		for(i=0;i<mem->mem_count;i++)
 		{
-			len+=snprintf(str,STR_LEN-len,"%lu %lu\n",virt_to_phys((char*)(mem->addrs[i])),mem->sizes[i]);
+			len+=snprintf(str,STR_LEN-len,"0x%lx %zu\n",(unsigned long)virt_to_phys((char*)(mem->addrs[i])),mem->sizes[i]);
 			if(len>=STR_LEN)
 			{
 				err=-ENOMEM;
@@ -547,7 +554,7 @@ int load_bigmem(struct big_mem *mem,const char *strdata)
 	if(NULL==mem->addrs||NULL==mem->sizes)
 		goto free_mem;
 	/// 反序列化 addrs sizes
-	for(i=0;i<mem->mem_count;i++);
+	for(i=0;i<mem->mem_count;i++)
 	{
 		tok=strtok_r(NULL,"\n",&saveptr);
 		if(NULL==tok)
@@ -593,7 +600,7 @@ int mmap_bigmem(struct big_mem *mem,int fd,int port,int flags)
 			err=-errno;
 			goto free_mmap;
 		}
-		mem->addrs[i]=(unsigned long)buf;
+		mem->addrs[map_index]=(unsigned long)buf;
 	}
 	return 0;
 free_mmap:
@@ -624,7 +631,8 @@ int unmmap_clean_bigmem(struct big_mem *mem)
 	/// 释放内存
 	free(mem->sizes);
 	free(mem->addrs);
-	mem->sizes=mem->addrs=0;
+	mem->sizes=NULL;
+	mem->addrs=NULL;
 }
 
 #endif
