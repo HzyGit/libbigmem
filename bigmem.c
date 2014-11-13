@@ -543,7 +543,7 @@ int load_bigmem(struct big_mem *mem,const char *strdata)
 		err=-EINVAL;
 		goto free_buf;
 	}
-	if(sscanf(tok,"%lu %lu",&mem->mem_count,&mem->mem_size)!=2)
+	if(sscanf(tok,"%lx %zu",&mem->mem_count,&mem->mem_size)!=2)
 	{
 		err=-EINVAL;
 		goto free_buf;
@@ -562,7 +562,7 @@ int load_bigmem(struct big_mem *mem,const char *strdata)
 			err=-EINVAL;
 			goto free_mem;
 		}
-		if(sscanf(tok,"%lu %lu",mem->addrs+i,mem->sizes+1)!=2)
+		if(sscanf(tok,"%lx %lu",mem->addrs+i,mem->sizes+i)!=2)
 		{
 			err=-EINVAL;
 			goto free_mem;
