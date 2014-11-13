@@ -3,6 +3,7 @@ obj-m+=test.o
 
 .PHONY: userspace_build userspace_clean kernel_build kernel_clean clean build
 .PHONY: kernel_test userspace_test
+.PHONY: tar
 
 build: kernel_build userspace_build
 
@@ -22,3 +23,5 @@ kernel_build:
 kernel_clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
+tar:
+	tar czvf ../libbigmem.tar.gz ../libbigmem
