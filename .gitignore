@@ -1,0 +1,14 @@
+#内核
+.bigmem*
+.test*
+*.o
+*.ko
+bigmem.mod.*
+test.mod.*
+modules.order
+Module.symvers
+.tmp_versions
+#用户
+tags
+test
+*.so
