@@ -27,7 +27,7 @@ static int cal_bigmem_coord(struct big_mem *mem,size_t index,unsigned long *bloc
 	if(mem==NULL)
 		return -EINVAL;
 	if(index>=mem->mem_size)
-		return -ENOMEM;
+		return -EFAULT;
 	/// 计算块号
 	for(i=0;i<mem->mem_count;i++)
 	{
@@ -90,7 +90,7 @@ static int _write_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t
 		return err;
 	/// 禁止跨越两个内存块
 	if(block_index1-block_index0>1)
-		return -EINVAL;
+		return -EFAULT;
 	/// 内存拷贝
 	if(block_index1==block_index0)
 		memcpy((void*)(mem->addrs[block_index0]+inner_index0),buf,buf_size);
@@ -119,7 +119,7 @@ static int _read_bigmem(struct big_mem *mem,size_t begin,void *buf,size_t buf_si
 		return err;
 	/// 禁止间隔两个内存块的读取
 	if(block_index1-block_index0>1)
-		return -EINVAL;
+		return -EFAULT;
 	/// 复制数据到buf
 	if(block_index0==block_index1)
 		memcpy(buf,(void*)(mem->addrs[block_index0]+inner_index0),buf_size);
