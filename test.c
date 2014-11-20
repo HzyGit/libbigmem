@@ -298,7 +298,7 @@ static int load_mem(struct big_mem *mem,const char *proc_name)
 	printf("catch the proc string:\n%s\n",buf);
 	printf("--------------------------\n");
 	/// 反序列化
-	if((err=load_bigmem(mem,buf))<0)
+	if((err=load_file_bigmem(mem,path))<0)
 	{
 		error_at_line(0,errno,__FILE__,__LINE__,"load_bigmem failed");
 		return err;
@@ -313,7 +313,8 @@ static int load_mem(struct big_mem *mem,const char *proc_name)
 		unmmap_clean_bigmem(mem);
 		return -errno;
 	}
-	if(mmap_bigmem(mem,fd,PROT_READ|PROT_WRITE,MAP_SHARED)<0)
+	//if(mmap_bigmem(mem,fd,PROT_READ|PROT_WRITE,MAP_SHARED)<0)
+	if(easy_mmap_bigmem(mem,"/dev/mem")<0)
 	{
 		error_at_line(0,errno,__FILE__,__LINE__,"mmap_bigmem failed");
 		unmmap_clean_bigmem(mem);

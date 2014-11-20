@@ -7,6 +7,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <sys/mman.h>
 #endif   ///USER_SPACE
@@ -19,7 +23,7 @@
 
 
 /// @brief 依据内存index计算，内存单元所在的块号和，块内索引
-/// @retval 0成功 <0失败
+/// @retval 成功返回0  失败返回错误代码的负值
 static int cal_bigmem_coord(struct big_mem *mem,size_t index,unsigned long *block_index,size_t *inner_index)
 {
 	int i=0;
@@ -27,7 +31,7 @@ static int cal_bigmem_coord(struct big_mem *mem,size_t index,unsigned long *bloc
 	if(mem==NULL)
 		return -EINVAL;
 	if(index>=mem->mem_size)
-		return -ENOMEM;
+		return -EFAULT;
 	/// 计算块号
 	for(i=0;i<mem->mem_count;i++)
 	{
@@ -39,7 +43,7 @@ static int cal_bigmem_coord(struct big_mem *mem,size_t index,unsigned long *bloc
 	}
 	/// 判断是否越界
 	if(i==mem->mem_count)
-		return -ENOMEM;
+		return -EFAULT;
 	if(NULL!=block_index)
 		*block_index=i;
 	if(inner_index!=NULL)
@@ -227,24 +231,22 @@ static int _cmp_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t b
 int init_bigmem(struct big_mem *mem,size_t mem_size,gfp_t flags)
 {
 	int err=0;   ///< 错误码
-	unsigned long block_count;   ///< 内存块
-	size_t end_size;   ///< 末块大小
-	int i;
-	int mem_index=0;
+	unsigned long block_count=0;   ///< 内存块
+	size_t end_size=0;   ///< 末块大小
+	int i=0;
+	int mem_index=0; /// 初始化成功的内存块index
 	
 	/// 判断参数
 	if(NULL==mem)
 		return -EINVAL;
 	if((err=mem_count(mem_size,&block_count,&end_size))<0)
 		return err;
-	if(NULL==mem)
-		return -EINVAL;
 	/// 初始化内存块
 	err=0;
 	mem->mem_size=mem_size;
 	mem->mem_count=block_count;
-	mem->addrs=(unsigned long*)kmalloc(sizeof(unsigned long)*mem->mem_count,GFP_KERNEL|GFP_ATOMIC);
-	mem->sizes=(size_t*)kmalloc(sizeof(size_t)*mem->mem_count,GFP_KERNEL|GFP_ATOMIC);
+	mem->addrs=(unsigned long*)kmalloc(sizeof(unsigned long)*mem->mem_count,flags);
+	mem->sizes=(size_t*)kmalloc(sizeof(size_t)*mem->mem_count,flags);
 	if(NULL==mem->addrs||NULL==mem->sizes)
 	{
 		err=-ENOMEM;
@@ -261,7 +263,6 @@ int init_bigmem(struct big_mem *mem,size_t mem_size,gfp_t flags)
 		mem->sizes[mem_index]=(1<<BIGMEM_MAX_ORDER)*PAGE_SIZE;
 	}
 	mem->addrs[mem->mem_count-1]=__get_free_pages(flags,get_order(end_size));
-	mem_index++;
 	mem->sizes[mem->mem_count-1]=end_size;
 	if(mem->addrs[mem->mem_count-1]==0)
 	{
@@ -274,6 +275,8 @@ int init_bigmem(struct big_mem *mem,size_t mem_size,gfp_t flags)
 clean_pages:
 	for(i=0;i<mem_index;i++)
 	{
+		if(0==mem->addrs[i])
+			continue;
 		if(i==mem->mem_count-1)
 		{
 			free_pages(mem->addrs[i],get_order(end_size));
@@ -303,17 +306,22 @@ void clean_bigmem(struct big_mem *mem)
 	if(NULL==mem)
 		return;
 	/// 释放内存
-	for(i=0;i<mem->mem_count;i++)
+	if(NULL!=mem->addrs)
 	{
-		if(i==mem->mem_count-1)
+		for(i=0;i<mem->mem_count;i++)
+		{
+			if(0==mem->addrs[i])
+				continue;
 			free_pages(mem->addrs[i],get_order(mem->sizes[i]));
-		else
-			free_pages(mem->addrs[i],BIGMEM_MAX_ORDER);
+			mem->addrs[i]=0;
+		}
 	}
 	/// 释放块数组
 	kfree(mem->addrs);
-	kfree(mem->sizes);
-	mem->addrs=mem->sizes=NULL;
+	mem->addrs=NULL;
+	if(NULL!=mem->sizes)
+		kfree(mem->sizes);
+	mem->sizes=NULL;
 }
 EXPORT_SYMBOL(clean_bigmem);
 #endif   /// USER_SPACE
@@ -480,7 +488,8 @@ EXPORT_SYMBOL(cmp_bigmem_bh);
 #endif   ///USER_SPACE
 
 #ifndef USER_SPACE
-/// @brief 将big_mem数据写入proc文件
+/// @brief 将big_mem数据序列化为字符串
+/// @retval 成功返回0 失败返回错误代码负值
 int dump_bigmem(struct big_mem *mem,char **strdata)
 {
 	const int STR_LEN=512;
@@ -499,7 +508,7 @@ int dump_bigmem(struct big_mem *mem,char **strdata)
 		size_t len=snprintf(str,STR_LEN,"%lu %zu\n",mem->mem_count,mem->mem_size);
 		if(len>=STR_LEN)
 		{
-			err=-ENOMEM;
+			err=-EFAULT;
 			break;
 		}
 		str=*strdata+len;
@@ -508,7 +517,7 @@ int dump_bigmem(struct big_mem *mem,char **strdata)
 			len+=snprintf(str,STR_LEN-len,"0x%lx %zu\n",(unsigned long)virt_to_phys((char*)(mem->addrs[i])),mem->sizes[i]);
 			if(len>=STR_LEN)
 			{
-				err=-ENOMEM;
+				err=-EFAULT;
 				break;
 			}
 			str=*strdata+len;
@@ -574,10 +583,48 @@ free_mem:
 		free(mem->addrs);
 	if(mem->sizes!=NULL)
 		free(mem->sizes);
+	mem->addrs=NULL;
+	mem->sizes=NULL;
 free_buf:
 	free(buf);
 	return err;
 }
+
+/// @brief 读取文件内容，并将其序列化为mem
+/// @retval 成功返回0 错误返回错误代码负值
+int load_file_bigmem(struct big_mem *mem,const char *file)
+{
+	const size_t STR_LEN=1024;
+	if(NULL==mem||NULL==file)
+		return -EINVAL;
+	/// 分配缓冲区，存储文件内容
+	char *buf=(char*)malloc(sizeof(char)*STR_LEN);
+	if(NULL==buf)
+		return -ENOMEM;
+	/// 读取文件内容
+	int err=0;
+	FILE *fp=fopen(file,"r");
+	if(NULL==fp)
+	{
+		err=-errno;
+		goto free_mem;
+	}
+	char *p=buf;
+	long left_len=STR_LEN;
+	while(fgets(p,left_len-1,fp)!=NULL)
+	{
+		left_len-=strlen(p);
+		p+=strlen(p);
+	}
+	/// 反序列化bigmem
+	err=load_bigmem(mem,buf);
+close_file:
+	fclose(fp);
+free_mem:
+	free(buf);
+	return err;
+}
+
 #endif  /// USER_SPACE
 
 #ifdef USER_SPACE
@@ -612,6 +659,24 @@ free_mmap:
 	return err;
 
 }
+
+/// @breif 读取内存设备文件，映射bigmem结构
+/// @retval 0成功 失败返回错误代码负值
+int easy_mmap_bigmem(struct big_mem *mem,const char *path)
+{
+	if(NULL==mem||NULL==path)
+		return -EINVAL;
+	int fd=open(path,O_RDWR);
+	if(fd<0)
+		return -errno;
+	/// 映射文件
+	int err=0;
+	err=mmap_bigmem(mem,fd,PROT_READ|PROT_WRITE,MAP_SHARED);
+close_file:
+	close(fd);
+	return err;
+}
+
 
 /// @brief 取消内存设备的映射,并释放bigmem的内存
 /// @retval 0 成功 <0失败

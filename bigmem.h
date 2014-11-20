@@ -3,10 +3,15 @@
 
 #ifndef USER_SPACE
 
+#include <linux/module.h>
 #include <linux/rwlock_types.h>
 #include <linux/slab.h>
 #define BIGMEM_MAX_ORDER 10    ///< 每次分配的最大order值
 #define BIGMEM_MAX_COUNT 32    ///< 分配的最大内存块个数
+
+#else /// USER_SPACE
+
+#include <stdlib.h>
 
 #endif /// USER_SPACE
 
@@ -31,9 +36,13 @@ int init_bigmem(struct big_mem *mem,size_t size,gfp_t flags);
 void clean_bigmem(struct big_mem *mem);
 #else   /// USER_SPACE
 
-/// @breif 读取内存设备文件，映射bigmem结构
-/// @retval 0成功 -1失败
+/// @breif 读取文件描述符fd，映射bigmem结构
+/// @retval 0成功 失败返回错误代码负值
 int mmap_bigmem(struct big_mem *mem,int fd,int port,int flags);
+/// @breif 读取内存设备文件，映射bigmem结构
+/// @retval 0成功 失败返回错误代码负值
+int easy_mmap_bigmem(struct big_mem *mem,const char *path);
+
 /// @brief 取消内存设备的映射,并释放bigmem的内存
 /// @retval 0 成功 <0失败
 int unmmap_clean_bigmem(struct big_mem *mem);
@@ -76,7 +85,12 @@ int cmp_bigmem(struct big_mem *mem,size_t begin,const void *buf,size_t buf_size,
 int dump_bigmem(struct big_mem *mem,char **strdata);
 #else    /// USER_SAPCE
 /// @brief 将字符串反序列化为big_mem
+/// @retval 成功返回0 错误返回代码负值
 int load_bigmem(struct big_mem *mem,const char *strdata);
+
+/// @brief 读取文件内容，并将其序列化为mem
+/// @retval 成功返回0 错误返回错误代码负值
+int load_file_bigmem(struct big_mem *mem,const char *file);
 #endif  /// USER_SPACE
 
 #ifndef USER_SPACE
