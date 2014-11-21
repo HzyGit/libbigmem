@@ -24,7 +24,7 @@ kernel_clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
 tar:
-	tar czvf ../libbigmem.tar.gz ../libbigmem
+	tar czvf ../libbigmem.tar.gz ../libbigmem --exclude .git/ --exclude .gitignore
 
 install:
 	cp libbigmem.so /usr/lib64/
